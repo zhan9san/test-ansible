@@ -1,0 +1,49 @@
+name: Manage Local Windows with Ansible on WSL2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ansible-wsl2:
+    runs-on: windows-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v3
+
+    - name: Install WSL2 and Linux distribution
+      run: |
+        wsl --set-default-version 2
+        wsl --install -d Ubuntu
+      shell: powershell
+
+    - name: Install Ansible in WSL2 and manage Windows host
+      run: |
+        # Configure WSL2 environment and install Ansible
+        wsl -d Ubuntu -- bash -c "sudo apt update && sudo apt install -y ansible"
+
+        # Create inventory file dynamically in WSL2
+        wsl -d Ubuntu -- bash -c 'echo "[windows]" > ~/inventory.ini'
+        wsl -d Ubuntu -- bash -c 'echo "localhost" >> ~/inventory.ini'
+        wsl -d Ubuntu -- bash -c 'echo "[windows:vars]" >> ~/inventory.ini'
+        wsl -d Ubuntu -- bash -c 'echo "ansible_user=your_windows_username" >> ~/inventory.ini'
+        wsl -d Ubuntu -- bash -c 'echo "ansible_password=your_windows_password" >> ~/inventory.ini'
+        wsl -d Ubuntu -- bash -c 'echo "ansible_connection=winrm" >> ~/inventory.ini'
+        wsl -d Ubuntu -- bash -c 'echo "ansible_winrm_transport=basic" >> ~/inventory.ini'
+        wsl -d Ubuntu -- bash -c 'echo "ansible_winrm_server_cert_validation=ignore" >> ~/inventory.ini'
+
+        # Create the Ansible playbook
+        wsl -d Ubuntu -- bash -c 'echo "- hosts: windows" > ~/playbook.yml'
+        wsl -d Ubuntu -- bash -c 'echo "  tasks:" >> ~/playbook.yml'
+        wsl -d Ubuntu -- bash -c 'echo "  - name: Check the Windows hostname" >> ~/playbook.yml'
+        wsl -d Ubuntu -- bash -c 'echo "    win_command: hostname" >> ~/playbook.yml'
+        wsl -d Ubuntu -- bash -c 'echo "    register: result" >> ~/playbook.yml'
+        wsl -d Ubuntu -- bash -c 'echo "  - name: Display the hostname" >> ~/playbook.yml'
+        wsl -d Ubuntu -- bash -c 'echo "    debug:" >> ~/playbook.yml'
+        wsl -d Ubuntu -- bash -c 'echo "      msg: \\"The Windows hostname is {{ result.stdout }}\\"" >> ~/playbook.yml'
+
+        # Run the Ansible playbook within WSL2
+        wsl -d Ubuntu -- bash -c "ansible-playbook -i ~/inventory.ini ~/playbook.yml"
+      shell: powershell
