@@ -1,4 +1,4 @@
-name: Manage Local Windows with Ansible on WSL2
+name: Manage Windows Host with Ansible via WSL
 
 on:
   push:
@@ -6,44 +6,39 @@ on:
       - main
 
 jobs:
-  ansible-wsl2:
+  ansible-wsl:
     runs-on: windows-latest
 
     steps:
-    - name: Check out the repository
+    - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Install WSL2 and Linux distribution
+    - name: Set up WSL
+      uses: webfactory/setup-wsl@v1
+      with:
+        distribution: "Ubuntu-20.04"  # You can choose your preferred distribution
+
+    - name: Run Ansible Playbook
       run: |
-        wsl --set-default-version 2
-        wsl --install -d Ubuntu
-      shell: powershell
+        # Install Ansible
+        sudo apt update
+        sudo apt install -y ansible
+        # Create inventory file
+        echo "[windows]" > inventory.ini
+        echo "localhost ansible_connection=local" >> inventory.ini
 
-    - name: Install Ansible in WSL2 and manage Windows host
-      run: |
-        # Configure WSL2 environment and install Ansible
-        wsl -d Ubuntu -- bash -c "sudo apt update && sudo apt install -y ansible"
+        # Write the Ansible playbook to manage the Windows host
+        echo "---" > playbook.yml
+        echo "- name: Test Ansible on Windows Host" >> playbook.yml
+        echo "  hosts: windows" >> playbook.yml
+        echo "  tasks:" >> playbook.yml
+        echo "  - name: Echo hostname" >> playbook.yml
+        echo "    win_command: hostname" >> playbook.yml
+        echo "    register: result" >> playbook.yml
+        echo "  - name: Output hostname" >> playbook.yml
+        echo "    debug:" >> playbook.yml
+        echo "      msg: \"Windows hostname is {{ result.stdout }}\"" >> playbook.yml
 
-        # Create inventory file dynamically in WSL2
-        wsl -d Ubuntu -- bash -c 'echo "[windows]" > ~/inventory.ini'
-        wsl -d Ubuntu -- bash -c 'echo "localhost" >> ~/inventory.ini'
-        wsl -d Ubuntu -- bash -c 'echo "[windows:vars]" >> ~/inventory.ini'
-        wsl -d Ubuntu -- bash -c 'echo "ansible_user=your_windows_username" >> ~/inventory.ini'
-        wsl -d Ubuntu -- bash -c 'echo "ansible_password=your_windows_password" >> ~/inventory.ini'
-        wsl -d Ubuntu -- bash -c 'echo "ansible_connection=winrm" >> ~/inventory.ini'
-        wsl -d Ubuntu -- bash -c 'echo "ansible_winrm_transport=basic" >> ~/inventory.ini'
-        wsl -d Ubuntu -- bash -c 'echo "ansible_winrm_server_cert_validation=ignore" >> ~/inventory.ini'
-
-        # Create the Ansible playbook
-        wsl -d Ubuntu -- bash -c 'echo "- hosts: windows" > ~/playbook.yml'
-        wsl -d Ubuntu -- bash -c 'echo "  tasks:" >> ~/playbook.yml'
-        wsl -d Ubuntu -- bash -c 'echo "  - name: Check the Windows hostname" >> ~/playbook.yml'
-        wsl -d Ubuntu -- bash -c 'echo "    win_command: hostname" >> ~/playbook.yml'
-        wsl -d Ubuntu -- bash -c 'echo "    register: result" >> ~/playbook.yml'
-        wsl -d Ubuntu -- bash -c 'echo "  - name: Display the hostname" >> ~/playbook.yml'
-        wsl -d Ubuntu -- bash -c 'echo "    debug:" >> ~/playbook.yml'
-        wsl -d Ubuntu -- bash -c 'echo "      msg: \\"The Windows hostname is {{ result.stdout }}\\"" >> ~/playbook.yml'
-
-        # Run the Ansible playbook within WSL2
-        wsl -d Ubuntu -- bash -c "ansible-playbook -i ~/inventory.ini ~/playbook.yml"
-      shell: powershell
+        # Run the playbook
+        ansible-playbook -i inventory.ini playbook.yml
+      shell: wsl-bash {0}
